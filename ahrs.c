@@ -170,7 +170,6 @@
 #define ZA_OFFSET_L      0x7E
 
 #define AHRS  1        // set to false for basic data read
-#define SerialDebug  1  // set to true to get Serial output for debugging
 
 // Set initial input parameters
 enum Ascale {
@@ -201,11 +200,6 @@ uint8_t Mscale = MFS_16BITS; // Choose either 14-bit or 16-bit magnetometer reso
 uint8_t Mmode = 0x02;        // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer data read
 float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
   
-// Pin definitions
-int intPin = 12;  // These can be changed, 2 and 3 are the Arduinos ext int pins
-int adoPin = 8;
-int myLed = 13;
-
 int16_t accelCount[3];  // Stores the 16-bit signed accelerometer sensor output
 int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
 int16_t magCount[3];    // Stores the 16-bit signed magnetometer sensor output
@@ -261,10 +255,12 @@ void delay(int d)
 
 unsigned long micros()
 {
+    return 0;
 }
 
 unsigned long millis()
 {
+    return 0;
 }
 
 int16_t readTempData()
@@ -499,8 +495,6 @@ void setup()
     // Read the WHO_AM_I register, this is a good test of communication
     uint8_t c = mpu9250_readbyte(&mpu9250, WHO_AM_I_MPU9250);  // Read WHO_AM_I register for MPU-9250
     printf("WHO_AM_I %02X\n", c);
-    delay(1000); 
-
     if (c != 0x73) // WHO_AM_I should always be 0x68
     {  
         fprintf(stderr, "CHIP ID %02X is not supported!\n", c);
@@ -514,7 +508,6 @@ void setup()
     fprintf(stderr, "x-axis self test: gyration trim within : %4.2f%% of factory value\n", SelfTest[3]);
     fprintf(stderr, "y-axis self test: gyration trim within : %4.2f%% of factory value\n", SelfTest[4]);
     fprintf(stderr, "z-axis self test: gyration trim within : %4.2f%% of factory value\n", SelfTest[5]);
-    delay(1000);
 
     calibrateMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
     fprintf(stderr, "MPU9250 bias:\n");
@@ -522,26 +515,25 @@ void setup()
     fprintf(stderr, "y: %8.3f mg  %8.3f o/s\n", 1000*accelBias[1], gyroBias[1]);
     fprintf(stderr, "z: %8.3f mg  %8.3f o/s\n", 1000*accelBias[2], gyroBias[2]);
 
-  delay(1000); 
   
-  initMPU9250(); 
-  //Serial.println("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
+    initMPU9250(); 
+    //Serial.println("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
+    
+    // Read the WHO_AM_I register of the magnetometer, this is a good test of communication
+    uint8_t d = ak8963_readbyte(&mpu9250, AK8963_WHO_AM_I);  // Read WHO_AM_I register for AK8963
+    fprintf(stderr, "AK8963 ID: %02X\n", d);
+    // Get magnetometer calibration from AK8963 ROM
+    initAK8963(magCalibration); //Serial.println("AK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
+    
+    fprintf(stderr, "Calibration values:\n");
+    fprintf(stderr, "X-Axis sensitivity adjustment value %8.3f\n", magCalibration[0]);
+    fprintf(stderr, "Y-Axis sensitivity adjustment value %8.3f\n", magCalibration[1]);
+    fprintf(stderr, "Z-Axis sensitivity adjustment value %8.3f\n", magCalibration[2]);
   
-  // Read the WHO_AM_I register of the magnetometer, this is a good test of communication
-  uint8_t d = ak8963_readbyte(&mpu9250, AK8963_WHO_AM_I);  // Read WHO_AM_I register for AK8963
-  fprintf(stderr, "AK8963 ID: %02X\n", d);
-  // Get magnetometer calibration from AK8963 ROM
-  initAK8963(magCalibration); //Serial.println("AK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
-  
-  fprintf(stderr, "Calibration values:\n");
-  fprintf(stderr, "X-Axis sensitivity adjustment value %8.3f\n", magCalibration[0]);
-  fprintf(stderr, "Y-Axis sensitivity adjustment value %8.3f\n", magCalibration[1]);
-  fprintf(stderr, "Z-Axis sensitivity adjustment value %8.3f\n", magCalibration[2]);
-
-  for(;;) {
-    loop();
-    usleep(10000);
-  }
+    for(;;) {
+      loop();
+      usleep(10000);
+    }
 }
 
 time_t last_update = 0;
@@ -1058,6 +1050,11 @@ void calibrateMPU9250(float * dest1, float * dest2)
     gyro_bias[0]  /= (int32_t) packet_count;
     gyro_bias[1]  /= (int32_t) packet_count;
     gyro_bias[2]  /= (int32_t) packet_count;
+
+  fprintf(stderr, "bias:\n");
+  fprintf(stderr, "ax:%5d   ay:%5d   az:%5d   gx:%5d   gy:%5d   gz:%5d\n",
+        accel_bias[0], accel_bias[1], accel_bias[2],
+        gyro_bias[0], gyro_bias[1], gyro_bias[2]);
     
   if(accel_bias[2] > 0L) {accel_bias[2] -= (int32_t) accelsensitivity;}  // Remove gravity from the z-axis accelerometer bias calculation
   else {accel_bias[2] += (int32_t) accelsensitivity;}

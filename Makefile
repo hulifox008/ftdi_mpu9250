@@ -1,4 +1,4 @@
-CFLAGS=-I/usr/include/libftdi1
+CFLAGS=-I/usr/include/libftdi1 -Wall
 
 %.o : %.c
 	$(CC) -c $^ -o $@ $(CFLAGS)

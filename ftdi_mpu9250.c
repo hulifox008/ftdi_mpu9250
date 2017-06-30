@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <sys/types.h>
+#include <libusb-1.0/libusb.h>
 #include "ftdi_mpu9250.h"
 #include "ahrs.h"
 
