@@ -505,9 +505,11 @@ void setup()
     fprintf(stderr, "y-axis self test: acceleration trim within : %4.2f%% of factory value\n", SelfTest[0]);
     fprintf(stderr, "z-axis self test: acceleration trim within : %4.2f%% of factory value\n", SelfTest[1]);
     fprintf(stderr, "x-axis self test: acceleration trim within : %4.2f%% of factory value\n", SelfTest[2]);
+    #if 0
     fprintf(stderr, "x-axis self test: gyration trim within : %4.2f%% of factory value\n", SelfTest[3]);
     fprintf(stderr, "y-axis self test: gyration trim within : %4.2f%% of factory value\n", SelfTest[4]);
     fprintf(stderr, "z-axis self test: gyration trim within : %4.2f%% of factory value\n", SelfTest[5]);
+    #endif
 
     calibrateMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
     fprintf(stderr, "MPU9250 bias:\n");
@@ -519,6 +521,7 @@ void setup()
     initMPU9250(); 
     //Serial.println("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
     
+    #if 0
     // Read the WHO_AM_I register of the magnetometer, this is a good test of communication
     uint8_t d = ak8963_readbyte(&mpu9250, AK8963_WHO_AM_I);  // Read WHO_AM_I register for AK8963
     fprintf(stderr, "AK8963 ID: %02X\n", d);
@@ -529,10 +532,10 @@ void setup()
     fprintf(stderr, "X-Axis sensitivity adjustment value %8.3f\n", magCalibration[0]);
     fprintf(stderr, "Y-Axis sensitivity adjustment value %8.3f\n", magCalibration[1]);
     fprintf(stderr, "Z-Axis sensitivity adjustment value %8.3f\n", magCalibration[2]);
-  
+    #endif 
     for(;;) {
       loop();
-      usleep(10000);
+      usleep(1000);
     }
 }
 
@@ -556,6 +559,8 @@ void loop()
     ax = (float)((int16_t)(raw[i]<<8 | raw[i+1]))*aRes; // - accelBias[0];  // get actual g value, this depends on scale being set
     ay = (float)((int16_t)(raw[i+2]<<8 | raw[i+3]))*aRes; // - accelBias[1];   
     az = (float)((int16_t)(raw[i+4]<<8 | raw[i+5]))*aRes; // - accelBias[2];  
+
+    fprintf(stderr, "rawx %d\n", (int16_t)(raw[i]<<8 | raw[i+1]));
    
     getGres();
  
@@ -914,6 +919,7 @@ void initAK8963(float * destination)
 
 void initMPU9250()
 {  
+#if 0
  // wake up device
   mpu9250_writebyte(&mpu9250, PWR_MGMT_1, 0x00); // Clear sleep mode bit (6), enable all sensors 
   delay(100); // Wait for all registers to reset 
@@ -921,6 +927,7 @@ void initMPU9250()
  // get stable time source
   mpu9250_writebyte(&mpu9250, PWR_MGMT_1, 0x01);  // Auto select clock source to be PLL gyroscope reference if ready else
   delay(200); 
+
   
  // Configure Gyro and Thermometer
  // Disable FSYNC and set thermometer and gyro bandwidth to 41 and 42 Hz, respectively; 
@@ -929,6 +936,7 @@ void initMPU9250()
  // DLPF_CFG = bits 2:0 = 011; this limits the sample rate to 1000 Hz for both
  // With the MPU9250, it is possible to get gyro sample rates of 32 kHz (!), 8 kHz, or 1 kHz
   mpu9250_writebyte(&mpu9250, CONFIG, 0x03);  
+
 
  // Set sample rate = gyroscope output rate/(1 + SMPLRT_DIV)
   mpu9250_writebyte(&mpu9250, SMPLRT_DIV, 0x04);  // Use a 200 Hz rate; a rate consistent with the filter update rate 
@@ -967,8 +975,10 @@ void initMPU9250()
   // clear on read of INT_STATUS, and enable I2C_BYPASS_EN so additional chips 
   // can join the I2C bus and all can be controlled by the Arduino as master
    mpu9250_writebyte(&mpu9250, INT_PIN_CFG, 0x22);    
-   mpu9250_writebyte(&mpu9250, INT_ENABLE, 0x01);  // Enable data ready (bit 0) interrupt
+   mpu9250_writebyte(&mpu9250, INT_ENABLE, 0x00);  // Enable data ready (bit 0) interrupt
+   #endif
 
+   mpu9250_writebyte(&mpu9250, I2C_MST_CTRL, 0x0D); // Enable I2C master
    mpu9250_writebyte(&mpu9250, USER_CTRL, 0x6C);    // Reset FIFO and DMP
    mpu9250_writebyte(&mpu9250, FIFO_EN, 0x78);
    delay(100);
@@ -1005,19 +1015,19 @@ void calibrateMPU9250(float * dest1, float * dest2)
     delay(15);
     
     // Configure MPU6050 gyro and accelerometer for bias calculation
-    mpu9250_writebyte(&mpu9250, CONFIG, 0x01);      // Set low-pass filter to 188 Hz
-    mpu9250_writebyte(&mpu9250, SMPLRT_DIV, 0x00);  // Set sample rate to 1 kHz
+    mpu9250_writebyte(&mpu9250, CONFIG, 0x03);    
+    mpu9250_writebyte(&mpu9250, SMPLRT_DIV, 0x04);  // Set sample rate to 1 kHz
     mpu9250_writebyte(&mpu9250, GYRO_CONFIG, 0x00);  // Set gyro full-scale to 250 degrees per second, maximum sensitivity
     mpu9250_writebyte(&mpu9250, ACCEL_CONFIG, 0x00); // Set accelerometer full-scale to 2 g, maximum sensitivity
+    mpu9250_writebyte(&mpu9250, ACCEL_CONFIG2, 0x03);
    
     uint16_t  gyrosensitivity  = 131;   // = 131 LSB/degrees/sec
     uint16_t  accelsensitivity = 16384;  // = 16384 LSB/g
   
       // Configure FIFO to capture accelerometer and gyro data for bias calculation
-    mpu9250_writebyte(&mpu9250, USER_CTRL, 0x60);   // Enable FIFO  
-    mpu9250_writebyte(&mpu9250, I2C_MST_CTRL, 0x0D); // Enable I2C master
+    mpu9250_writebyte(&mpu9250, USER_CTRL, 0x40);   // Enable FIFO  
     mpu9250_writebyte(&mpu9250, FIFO_EN, 0x78);     // Enable gyro and accelerometer sensors for FIFO  (max size 512 bytes in MPU-9150)
-    delay(100);
+    delay(5000);
   
     // At end of sample accumulation, turn off FIFO sensor read
     mpu9250_writebyte(&mpu9250, FIFO_EN, 0x00);        // Disable gyro and accelerometer sensors for FIFO
@@ -1028,28 +1038,36 @@ void calibrateMPU9250(float * dest1, float * dest2)
     
     for (ii = 0; ii < packet_count; ii++) {
         int16_t accel_temp[3] = {0, 0, 0}, gyro_temp[3] = {0, 0, 0};
-        mpu9250_readbytes(&mpu9250, FIFO_R_W, 12, &data[0]); // read data for averaging
-        accel_temp[0] = (int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each sample in FIFO
-        accel_temp[1] = (int16_t) (((int16_t)data[2] << 8) | data[3]  ) ;
-        accel_temp[2] = (int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;    
-        gyro_temp[0]  = (int16_t) (((int16_t)data[6] << 8) | data[7]  ) ;
-        gyro_temp[1]  = (int16_t) (((int16_t)data[8] << 8) | data[9]  ) ;
-        gyro_temp[2]  = (int16_t) (((int16_t)data[10] << 8) | data[11]) ;
+        mpu9250_readbytes(&mpu9250, FIFO_R_W, 6, &data[0]); // read data for averaging
+        accel_temp[0] = (int16_t) (data[0] << 8 | data[1]  ) ;  // Form signed 16-bit integer for each sample in FIFO
+        accel_temp[1] = (int16_t) (data[2] << 8 | data[3]  ) ;
+        accel_temp[2] = (int16_t) (data[4] << 8 | data[5]  ) ;    
+        #if 0
+        gyro_temp[0]  = (int16_t) (data[6] << 8 | data[7]  ) ;
+        gyro_temp[1]  = (int16_t) (data[8] << 8 | data[9]  ) ;
+        gyro_temp[2]  = (int16_t) (data[10] << 8 | data[11]) ;
+        #endif
+        fprintf(stderr, "temp ax: %d\n", accel_temp[0]);
         
-        accel_bias[0] += (int32_t) accel_temp[0]; // Sum individual signed 16-bit biases to get accumulated signed 32-bit biases
-        accel_bias[1] += (int32_t) accel_temp[1];
-        accel_bias[2] += (int32_t) accel_temp[2];
-        gyro_bias[0]  += (int32_t) gyro_temp[0];
-        gyro_bias[1]  += (int32_t) gyro_temp[1];
-        gyro_bias[2]  += (int32_t) gyro_temp[2];
+        accel_bias[0] += accel_temp[0]; // Sum individual signed 16-bit biases to get accumulated signed 32-bit biases
+        accel_bias[1] += accel_temp[1];
+        accel_bias[2] += accel_temp[2];
+        #if 0
+        gyro_bias[0]  += gyro_temp[0];
+        gyro_bias[1]  += gyro_temp[1];
+        gyro_bias[2]  += gyro_temp[2];
+        #endif
             
     }
+    return ;
     accel_bias[0] /= (int32_t) packet_count; // Normalize sums to get average count biases
     accel_bias[1] /= (int32_t) packet_count;
     accel_bias[2] /= (int32_t) packet_count;
+    #if 0
     gyro_bias[0]  /= (int32_t) packet_count;
     gyro_bias[1]  /= (int32_t) packet_count;
     gyro_bias[2]  /= (int32_t) packet_count;
+    #endif
 
   fprintf(stderr, "bias:\n");
   fprintf(stderr, "ax:%5d   ay:%5d   az:%5d   gx:%5d   gy:%5d   gz:%5d\n",
@@ -1068,12 +1086,14 @@ void calibrateMPU9250(float * dest1, float * dest2)
   data[5] = (-gyro_bias[2]/4)       & 0xFF;
   
 // Push gyro biases to hardware registers
+#if 0
   mpu9250_writebyte(&mpu9250, XG_OFFSET_H, data[0]);
   mpu9250_writebyte(&mpu9250, XG_OFFSET_L, data[1]);
   mpu9250_writebyte(&mpu9250, YG_OFFSET_H, data[2]);
   mpu9250_writebyte(&mpu9250, YG_OFFSET_L, data[3]);
   mpu9250_writebyte(&mpu9250, ZG_OFFSET_H, data[4]);
   mpu9250_writebyte(&mpu9250, ZG_OFFSET_L, data[5]);
+#endif
   
 // Output scaled gyro biases for display in the main program
   dest1[0] = (float) gyro_bias[0]/(float) gyrosensitivity;  
@@ -1088,43 +1108,61 @@ void calibrateMPU9250(float * dest1, float * dest2)
 
   int32_t accel_bias_reg[3] = {0, 0, 0}; // A place to hold the factory accelerometer trim biases
   mpu9250_readbytes(&mpu9250, XA_OFFSET_H, 2, &data[0]); // Read factory accelerometer trim values
-  accel_bias_reg[0] = (int32_t) (((int16_t)data[0] << 8) | data[1]);
+  accel_bias_reg[0] = (int16_t)(data[0]<<8 | data[1]);
   mpu9250_readbytes(&mpu9250, YA_OFFSET_H, 2, &data[0]);
-  accel_bias_reg[1] = (int32_t) (((int16_t)data[0] << 8) | data[1]);
+  accel_bias_reg[1] = (int16_t)(data[0]<<8 | data[1]);
   mpu9250_readbytes(&mpu9250, ZA_OFFSET_H, 2, &data[0]);
-  accel_bias_reg[2] = (int32_t) (((int16_t)data[0] << 8) | data[1]);
+  accel_bias_reg[2] = (int16_t)(data[0]<<8 | data[1]);
+
+  fprintf(stderr, "Factory acc bias raw: %d %d %d\n", accel_bias_reg[0], accel_bias_reg[1], accel_bias_reg[2]);
+  fprintf(stderr, "Factory acc bias: %fmg %fmg %fmg\n", accel_bias_reg[0]*0.4883f, accel_bias_reg[1]*0.4883f, accel_bias_reg[2]*0.4883f);
   
-  uint32_t mask = 1uL; // Define mask for temperature compensation bit 0 of lower byte of accelerometer bias registers
-  uint8_t mask_bit[3] = {0, 0, 0}; // Define array to hold mask bit for each accelerometer bias axis
-  
-  for(ii = 0; ii < 3; ii++) {
-    if((accel_bias_reg[ii] & mask)) mask_bit[ii] = 0x01; // If temperature compensation bit is set, record that fact in mask_bit
-  }
-  
+  #if 0
   // Construct total accelerometer bias, including calculated average accelerometer bias from above
   accel_bias_reg[0] -= (accel_bias[0]/8); // Subtract calculated averaged accelerometer bias scaled to 2048 LSB/g (16 g full scale)
   accel_bias_reg[1] -= (accel_bias[1]/8);
   accel_bias_reg[2] -= (accel_bias[2]/8);
+  #endif
+
+  accel_bias_reg[0] += 0.9/32*65536;
+
+  fprintf(stderr, "new  acc bias: %fmg %fmg %fmg\n", accel_bias_reg[0]*0.4883f, accel_bias_reg[1]*0.4883f, accel_bias_reg[2]*0.4883f);
   
-  data[0] = (accel_bias_reg[0] >> 8) & 0xFF;
-  data[1] = (accel_bias_reg[0])      & 0xFF;
-  data[1] = data[1] | mask_bit[0]; // preserve temperature compensation bit when writing back to accelerometer bias registers
-  data[2] = (accel_bias_reg[1] >> 8) & 0xFF;
-  data[3] = (accel_bias_reg[1])      & 0xFF;
-  data[3] = data[3] | mask_bit[1]; // preserve temperature compensation bit when writing back to accelerometer bias registers
-  data[4] = (accel_bias_reg[2] >> 8) & 0xFF;
-  data[5] = (accel_bias_reg[2])      & 0xFF;
-  data[5] = data[5] | mask_bit[2]; // preserve temperature compensation bit when writing back to accelerometer bias registers
- 
+  data[0] = (((uint16_t)accel_bias_reg[0] >>8)) & 0xFF;
+  data[1] = (uint16_t)accel_bias_reg[0] & 0xFE;
+  data[2] = (((uint16_t)accel_bias_reg[1] >>8)) & 0xFF;
+  data[3] = (uint16_t)accel_bias_reg[1] & 0xFE;
+  data[4] = (((uint16_t)accel_bias_reg[2] >>8)) & 0xFF;
+  data[5] = (uint16_t)accel_bias_reg[2] & 0xFE;
+
+    fprintf(stderr, "bias reg:");
+  for(ii=0;ii<6;ii++) {
+    fprintf(stderr, "%02X ", data[ii]);
+  }
+  fprintf(stderr, "\n");
+
 // Apparently this is not working for the acceleration biases in the MPU-9250
 // Are we handling the temperature correction bit properly?
 // Push accelerometer biases to hardware registers
+ #if 0
   mpu9250_writebyte(&mpu9250, XA_OFFSET_H, data[0]);
   mpu9250_writebyte(&mpu9250, XA_OFFSET_L, data[1]);
   mpu9250_writebyte(&mpu9250, YA_OFFSET_H, data[2]);
   mpu9250_writebyte(&mpu9250, YA_OFFSET_L, data[3]);
   mpu9250_writebyte(&mpu9250, ZA_OFFSET_H, data[4]);
   mpu9250_writebyte(&mpu9250, ZA_OFFSET_L, data[5]);
+  #endif
+
+  mpu9250_readbytes(&mpu9250, XA_OFFSET_H, 2, &data[0]); // Read factory accelerometer trim values
+  accel_bias_reg[0] = (int16_t)(data[0]<<8 | data[1]);
+  mpu9250_readbytes(&mpu9250, YA_OFFSET_H, 2, &data[0]);
+  accel_bias_reg[1] = (int16_t)(data[0]<<8 | data[1]);
+  mpu9250_readbytes(&mpu9250, ZA_OFFSET_H, 2, &data[0]);
+  accel_bias_reg[2] = (int16_t)(data[0]<<8 | data[1]);
+
+  fprintf(stderr, "Factory acc bias raw: %d %d %d\n", accel_bias_reg[0], accel_bias_reg[1], accel_bias_reg[2]);
+  fprintf(stderr, "Factory acc bias: %fmg %fmg %fmg\n", accel_bias_reg[0]*0.4883f, accel_bias_reg[1]*0.4883f, accel_bias_reg[2]*0.4883f);
+ 
 
 // Output scaled accelerometer biases for display in the main program
    dest2[0] = (float)accel_bias[0]/(float)accelsensitivity; 
@@ -1158,10 +1196,12 @@ void MPU9250SelfTest(float * destination) // Should return percent deviation fro
         aAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;  
         aAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ; 
         
+        #if 0 
         mpu9250_readbytes(&mpu9250, GYRO_XOUT_H, 6, &rawData[0]);       // Read the six raw data registers sequentially into data array
         gAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;  // Turn the MSB and LSB into a signed 16-bit value
         gAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;  
         gAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ; 
+        #endif
     }
     
     for (ii =0; ii < 3; ii++) {  // Get average of 200 values and store as average current readings
@@ -1180,11 +1220,13 @@ void MPU9250SelfTest(float * destination) // Should return percent deviation fro
         aSTAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;  // Turn the MSB and LSB into a signed 16-bit value
         aSTAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;  
         aSTAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ; 
-        
+
+        #if 0
         mpu9250_readbytes(&mpu9250, GYRO_XOUT_H, 6, &rawData[0]);  // Read the six raw data registers sequentially into data array
         gSTAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;  // Turn the MSB and LSB into a signed 16-bit value
         gSTAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;  
         gSTAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ; 
+        #endif
     }
     
     for (ii =0; ii < 3; ii++) {  // Get average of 200 values and store as average self-test readings
@@ -1222,7 +1264,9 @@ void MPU9250SelfTest(float * destination) // Should return percent deviation fro
   // To get percent, must multiply by 100
     for (i = 0; i < 3; i++) {
         destination[i]   = 100.0*((float)(aSTAvg[i] - aAvg[i]))/factoryTrim[i] - 100.;   // Report percent differences
+        #if 0
         destination[i+3] = 100.0*((float)(gSTAvg[i] - gAvg[i]))/factoryTrim[i+3] - 100.; // Report percent differences
+        #endif
     }
 }
 
