@@ -217,7 +217,7 @@ int main()
 
 
     /* set clk divisor for 300KHz clock */
-    ret = ftdi_write_data(ftdi_ctx, "\x86\x20\x00", 3);
+    ret = ftdi_write_data(ftdi_ctx, "\x86\x10\x00", 3);
     fprintf(stderr, "ftdi_write_data() ret %d\n", ret);
 
     /* set data bits low.  SCK, MOSI lo, CSn hi */
